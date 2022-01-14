@@ -14,6 +14,36 @@ pub fn build(b: *std.build.Builder) void {
     const exe = b.addExecutable("SpaceDuel", "src/main.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
+
+    // cImport
+    exe.linkLibC();
+    // raylib.h
+    exe.addIncludeDir("lib/raylib");
+    // raylib
+    exe.addObjectFile(switch (target.getOsTag()) {
+        .windows => "lib/raylib/raylib.lib",
+        .linux => "lib/raylib/libraylib.a",
+        else => @panic("Unsupported OS")
+    });
+    // system libs for raylib
+    switch (exe.target.toTarget().os.tag) {
+        .windows => {
+            exe.linkSystemLibrary("winmm");
+            exe.linkSystemLibrary("gdi32");
+            exe.linkSystemLibrary("opengl32");
+        },
+        .linux => {
+            // exe.linkSystemLibrary("GL");
+            exe.linkSystemLibrary("rt");
+            exe.linkSystemLibrary("dl");
+            exe.linkSystemLibrary("m");
+            // exe.linkSystemLibrary("X11");
+        },
+        else => {
+            @panic("Unsupported OS");
+        },
+    }
+
     exe.install();
 
     const run_cmd = exe.run();
