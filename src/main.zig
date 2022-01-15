@@ -1,15 +1,24 @@
 const std = @import("std");
-const ray = @cImport({
+const r = @cImport({
     @cInclude("raylib.h");
 });
 
-const Modes = enum{
+const Mode = enum{
     init,
     menu,
     pause,
     play,
     stats,
     settings
+};
+
+const diffs = [_][]const u8{
+    "recruit",
+    "cadet",
+    "sergeant",
+    "lieutenant",
+    "captain",
+    "commander"
 };
 
 const FPS = 60;
@@ -21,51 +30,187 @@ var screenHeight = SCR_HEIGHT;
 var textSize: c_int = 20;
 
 pub fn main() void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+
     //init window
-    ray.InitWindow(screenWidth, screenHeight, "SpaceDuel");
-    defer ray.CloseWindow();
-    ray.SetTargetFPS(FPS);
+    r.InitWindow(screenWidth, screenHeight, "SpaceDuel");
+    defer r.CloseWindow();
+    r.SetTargetFPS(FPS);
     //make fullscreen on full resolution
-    ToggleFullscreen();
+    //toggleFullscreen();
     //init audio
-    ray.InitAudioDevice();
-    defer ray.CloseAudioDevice();
+    r.InitAudioDevice();
+    defer r.CloseAudioDevice();
     //load textures
     //TODO
     //load sounds
     //TODO
     //setup
+    var mode: Mode = .init;
+    var diff: usize = 0;
+    var scorePlayer: u8 = undefined;
+    var scoreEnemy: u8 = undefined;
 
-    while (!ray.WindowShouldClose()) {
-        ray.BeginDrawing();
-        defer ray.EndDrawing();
-
-        ray.ClearBackground(ray.RAYWHITE);
-        ray.DrawText("Hello, World!", 325, 200, textSize, ray.LIGHTGRAY);
+    while (!r.WindowShouldClose()) {
+        //UPDATE-------------------------------------------------
+        switch (mode) {
+            .init => {
+                mode = .menu;
+                scorePlayer = 0;
+                scoreEnemy = 0;
+            },
+            .menu => {
+                if (r.IsKeyPressed(r.KEY_F11)) {
+                    toggleFullscreen();
+                }
+                else if (r.IsKeyPressed(r.KEY_SPACE)) {
+                    diff = @mod(diff+1,diffs.len);
+                }
+                else if (r.IsMouseButtonPressed(r.MOUSE_BUTTON_LEFT) 
+                    or r.IsMouseButtonPressed(r.MOUSE_BUTTON_RIGHT)) {
+                    mode = .play;
+                }
+            },
+            .pause => {
+                if (r.IsKeyPressed(r.KEY_F11)) {
+                    toggleFullscreen();
+                }
+                else if (r.IsMouseButtonPressed(r.MOUSE_BUTTON_LEFT) 
+                    or r.IsMouseButtonPressed(r.MOUSE_BUTTON_RIGHT)) {
+                    mode = .play;
+                }
+            },
+            .play => {
+                if (r.IsKeyPressed(r.KEY_SPACE)) {
+                    mode = .pause;
+                }
+            },
+            .stats => {
+                if (r.IsKeyPressed(r.KEY_SPACE)) {
+                    mode = .init;
+                }
+            },
+            .settings => {
+                
+            },
+        }
+        //DRAW---------------------------------------------------
+        r.BeginDrawing();
+        defer r.EndDrawing();
+        r.ClearBackground(r.RAYWHITE);
+        //score
+        const allocator = gpa.allocator();
+        const scoreText = std.fmt.allocPrintZ(allocator,"{d}-{d}",.{scorePlayer,scoreEnemy}) catch "ERROR";
+        defer allocator.free(scoreText);
+        r.DrawText(scoreText.ptr, textSize, textSize, textSize, r.GRAY);
+        //render
+        const x = @divFloor(screenWidth,2);
+        const y = @divFloor(screenHeight,2);
+        switch (mode) {
+            .init => {
+                drawTextCentered("[LOADING...]",x,y,textSize,r.GRAY);
+            },
+            .menu => {
+                drawTextCentered("SPACE-DUEL",x,y-5*textSize ,4*textSize,r.GRAY);
+                const diffText = std.fmt.allocPrintZ(allocator,"[{s}]",.{diffs[diff]}) catch "ERROR";
+                drawTextCentered(diffText.ptr,x,y-2*textSize,textSize,r.GRAY);
+                drawTextCentered("[RMB - move]",x,y,textSize,r.GRAY);
+                drawTextCentered("[LMB - shoot]",x,y+2*textSize,textSize,r.GRAY);
+                drawTextCentered("[SPACE - change difficulty/pause]",x,y+4*textSize,textSize,r.GRAY);
+                drawTextCentered("[ESC - quit]",x,y+6*textSize,textSize,r.GRAY);               
+            },
+            .pause => {
+                drawTextCentered("[PAUSED - click anywhere to continue]",x,y,textSize,r.GRAY);
+            },
+            .play => {
+                
+            },
+            .stats => {
+                var text: [*c]const u8 = undefined;
+                var subtext: [*c]const u8 = undefined;
+                if (true) {
+                // if (player.hp > 0) {
+                    if (true) {
+                    // if (scoreEnemy > 0) {
+                        text = "GG WP, pilot";
+                        subtext = switch (diff) {
+                            0,1 => "wanna try a harder difficulty?",
+                            2,3 => "you are a promising fighter",
+                            4,5 => "what a fight!",
+                            else => unreachable
+                        };
+                    }
+                    else {
+                        text = "FLAWLESS!";
+                        subtext = switch (diff) {
+                            0,1 => "scared of a harder difficulty?",
+                            2,3 => "already proving your talent",
+                            4,5 => "you are a true master!",
+                            else => unreachable
+                        };
+                    }
+                }
+                else if (true) {
+                // else if (enemy.hp > 0) {
+                    if (true) {
+                    // if (enemy.hp > 2) {
+                        text = "GG EZ";
+                        subtext = "better luck next time";
+                    }
+                    else {
+                        text = "GG, close";
+                        subtext = "but you still lost";
+                    }
+                }
+                else {
+                    text = "...";
+                    subtext = "what do you think you are doing?";
+                }
+                drawTextCentered(text,x,y,2*textSize,r.GRAY);
+                drawTextCentered(subtext,x,y+2*textSize,textSize,r.GRAY);
+                const diffText = std.fmt.allocPrintZ(allocator,"[{s}]",.{diffs[diff]}) catch "ERROR";
+                drawTextCentered(diffText.ptr,x,y+4*textSize,textSize,r.GRAY);
+                drawTextCentered("[SPACE - continue]",x,y+6*textSize,textSize,r.GRAY);
+            },
+            .settings => {
+                
+            },
+        }
     }
 }
 
-fn ToggleFullscreen() void {
-    if (ray.IsWindowFullscreen()) {
+fn toggleFullscreen() void {
+    if (r.IsWindowFullscreen()) {
         screenWidth = SCR_WIDTH;
         screenHeight = SCR_HEIGHT;
+        r.ToggleFullscreen();
+        r.SetWindowSize(screenWidth,screenHeight);
     }
     else{
-        screenWidth = ray.GetMonitorWidth(ray.GetCurrentMonitor());
-        screenHeight = ray.GetMonitorHeight(ray.GetCurrentMonitor());
+        screenWidth = r.GetMonitorWidth(r.GetCurrentMonitor());
+        screenHeight = r.GetMonitorHeight(r.GetCurrentMonitor());
+        r.SetWindowSize(screenWidth,screenHeight);
+        r.BeginDrawing();
+        r.EndDrawing();
+        r.ToggleFullscreen();
     }
-    ray.SetWindowSize(screenWidth,screenHeight);
-    ray.BeginDrawing();
-    ray.EndDrawing();
-    ray.ToggleFullscreen();
     textSize = @divFloor(
         @minimum(screenWidth,screenHeight),
         TXT_REL_SIZE
     );
 }
 
-//fn DrawTextCentered(text: const)
+fn drawTextCentered (
+    text: [*c]const u8,
+    x: c_int,
+    y: c_int,
+    size: c_int,
+    color: r.Color) void {
+    const dx = @divFloor(r.MeasureText(text,size),2);
+    const dy = @divFloor(size,2);
+    r.DrawText(text,x - dx,y - dy, size, color);
+}
 
 test "basic test" {
-    try std.testing.expectEqual(10, 3 + 7);
+    try std.testing.expect(10 == 3 + 7);
 }

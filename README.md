@@ -1,6 +1,6 @@
-# Title
+# Space Duel
 ...
 
-# VsCode extensions:
+## VsCode extensions:
 * CodeLLDB - vadimcn
 * Zig - tiehuis
