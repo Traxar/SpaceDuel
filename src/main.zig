@@ -2,6 +2,7 @@ const std = @import("std");
 const r = @cImport({
     @cInclude("raylib.h");
 });
+const objs = @import("objects.zig");
 
 const Mode = enum{
     init,
@@ -23,14 +24,20 @@ const diffs = [_][]const u8{
 
 const FPS = 60;
 const TXT_REL_SIZE = 20;
-const SCR_WIDTH: c_int = 800;
-const SCR_HEIGHT: c_int = 450;
+const SCR_WIDTH: i32 = 800;
+const SCR_HEIGHT: i32 = 450;
 var screenWidth = SCR_WIDTH;
 var screenHeight = SCR_HEIGHT;
-var textSize: c_int = 20;
+var textSize: i32 = 20;
 
-pub fn main() void {
+pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    defer {
+        const leaked = gpa.deinit();
+        if (leaked) @panic("TEST FAIL");
+    }
+    const allocator = gpa.allocator();
+    objs.allocator = &allocator;
 
     //init window
     r.InitWindow(screenWidth, screenHeight, "SpaceDuel");
@@ -46,10 +53,14 @@ pub fn main() void {
     //load sounds
     //TODO
     //setup
+
+
+
     var mode: Mode = .init;
     var diff: usize = 0;
     var scorePlayer: u8 = undefined;
     var scoreEnemy: u8 = undefined;
+    var world = try objs.Base.create();
 
     while (!r.WindowShouldClose()) {
         //UPDATE-------------------------------------------------
@@ -58,6 +69,8 @@ pub fn main() void {
                 mode = .menu;
                 scorePlayer = 0;
                 scoreEnemy = 0;
+                var player = try objs.Base.create();
+                world.add(player);
             },
             .menu => {
                 if (r.IsKeyPressed(r.KEY_F11)) {
@@ -99,7 +112,6 @@ pub fn main() void {
         defer r.EndDrawing();
         r.ClearBackground(r.RAYWHITE);
         //score
-        const allocator = gpa.allocator();
         const scoreText = std.fmt.allocPrintZ(allocator,"{d}-{d}",.{scorePlayer,scoreEnemy}) catch "ERROR";
         defer allocator.free(scoreText);
         r.DrawText(scoreText.ptr, textSize, textSize, textSize, r.GRAY);
@@ -113,6 +125,7 @@ pub fn main() void {
             .menu => {
                 drawTextCentered("SPACE-DUEL",x,y-5*textSize ,4*textSize,r.GRAY);
                 const diffText = std.fmt.allocPrintZ(allocator,"[{s}]",.{diffs[diff]}) catch "ERROR";
+                defer allocator.free(diffText);
                 drawTextCentered(diffText.ptr,x,y-2*textSize,textSize,r.GRAY);
                 drawTextCentered("[RMB - move]",x,y,textSize,r.GRAY);
                 drawTextCentered("[LMB - shoot]",x,y+2*textSize,textSize,r.GRAY);
@@ -126,8 +139,8 @@ pub fn main() void {
                 
             },
             .stats => {
-                var text: [*c]const u8 = undefined;
-                var subtext: [*c]const u8 = undefined;
+                var text: [*]const u8 = undefined;
+                var subtext: [*]const u8 = undefined;
                 if (true) {
                 // if (player.hp > 0) {
                     if (true) {
@@ -201,10 +214,10 @@ fn toggleFullscreen() void {
 }
 
 fn drawTextCentered (
-    text: [*c]const u8,
-    x: c_int,
-    y: c_int,
-    size: c_int,
+    text: [*]const u8,
+    x: i32,
+    y: i32,
+    size: i32,
     color: r.Color) void {
     const dx = @divFloor(r.MeasureText(text,size),2);
     const dy = @divFloor(size,2);
