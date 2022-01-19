@@ -34,10 +34,9 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer {
         const leaked = gpa.deinit();
-        if (leaked) @panic("TEST FAIL");
+        if (leaked) @panic("LEAK DETECTED");
     }
     const allocator = gpa.allocator();
-    objs.allocator = &allocator;
 
     //init window
     r.InitWindow(screenWidth, screenHeight, "SpaceDuel");
@@ -60,7 +59,10 @@ pub fn main() !void {
     var diff: usize = 0;
     var scorePlayer: u8 = undefined;
     var scoreEnemy: u8 = undefined;
-    var world = try objs.Base.create();
+    var world = objs.World{
+        .allocator = &allocator
+    };
+    defer world.clear();
 
     while (!r.WindowShouldClose()) {
         //UPDATE-------------------------------------------------
@@ -69,8 +71,8 @@ pub fn main() !void {
                 mode = .menu;
                 scorePlayer = 0;
                 scoreEnemy = 0;
-                var player = try objs.Base.create();
-                world.add(player);
+                _ = try objs.Base.create(&world);
+                _ = try objs.Base.create(&world);
             },
             .menu => {
                 if (r.IsKeyPressed(r.KEY_F11)) {
