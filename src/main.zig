@@ -2,7 +2,7 @@ const std = @import("std");
 const r = @cImport({
     @cInclude("raylib.h");
 });
-const objs = @import("objects.zig");
+const w = @import("world.zig");
 
 const Mode = enum{
     init,
@@ -53,13 +53,11 @@ pub fn main() !void {
     //TODO
     //setup
 
-
-
     var mode: Mode = .init;
     var diff: usize = 0;
     var scorePlayer: u8 = undefined;
     var scoreEnemy: u8 = undefined;
-    var world = objs.World{
+    var world = w.World{
         .allocator = &allocator
     };
     defer world.clear();
@@ -71,8 +69,8 @@ pub fn main() !void {
                 mode = .menu;
                 scorePlayer = 0;
                 scoreEnemy = 0;
-                _ = try objs.Base.create(&world);
-                _ = try objs.Base.create(&world);
+                _ = try w.Ship.create(&world);
+                _ = try w.Bullet.create(&world);
             },
             .menu => {
                 if (r.IsKeyPressed(r.KEY_F11)) {

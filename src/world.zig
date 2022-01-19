@@ -8,10 +8,10 @@ pub const World = struct {
     allocator: *const std.mem.Allocator = undefined,
 
     pub fn clear(self: *World) void {
-        var e = self.first;
-        while (e) |ent| {
-            e = ent.next;
-            self.allocator.destroy(ent);
+        var o = self.first;
+        while (o) |obj| {
+            o = obj.next;
+            self.allocator.destroy(obj);
         }
         self.first = null;
     }
@@ -28,16 +28,16 @@ pub const Base = struct {
     world: *World = undefined,
     object: Object = undefined,
     
-    pub fn create(world: *World) !*Base {
-        const ent = try world.allocator.create(Base);
-        ent.* = Base{};
-        ent.world = world;
+    fn create(world: *World) !*Base {
+        const obj = try world.allocator.create(Base);
+        obj.* = Base{};
+        obj.world = world;
         if (world.first) |next| {
-            ent.next = next;
-            next.prev = ent;
+            obj.next = next;
+            next.prev = obj;
         }
-        world.first = ent;
-        return ent;
+        world.first = obj;
+        return obj;
     }
     pub fn destroy(self: *Base) void {
         if (self.prev) |prev| {
@@ -54,9 +54,19 @@ pub const Base = struct {
 };
 
 pub const Ship = struct {
-    todo: u8 
+    todo: u8 = 0,
+    pub fn create(world: *World) !*Base {
+        const obj = try Base.create(world);
+        obj.object = Object{.ship = Ship{}};
+        return obj;
+    }
 };
 
 pub const Bullet = struct {
-    todo: u8
+    todo: u8 = 0,
+    pub fn create(world: *World) !*Base {
+        const obj = try Base.create(world);
+        obj.object = Object{.bullet = Bullet{}};
+        return obj;
+    }
 };
