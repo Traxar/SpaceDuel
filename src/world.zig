@@ -1,7 +1,6 @@
 const std = @import("std");
-const r = @cImport({
-    @cInclude("raylib.h");
-});
+const r = @import("imports.zig").raylib;
+
 
 pub const World = struct {
     first: ?*Base = null,
@@ -17,20 +16,25 @@ pub const World = struct {
     }
 };
 
-const Object = union {
+pub const Object = union {
     ship: Ship,
     bullet: Bullet,
 };
 
 pub const Base = struct {
+    //object system
     prev: ?*Base = null,
     next: ?*Base = null,
     world: *World = undefined,
-    object: Object = undefined,
+    object: Object,
+    //game
+    position: r.Vector2,
+    facing: f32,
+
     
-    fn create(world: *World) !*Base {
+    pub fn create(world: *World, init: Base) !*Base {
         const obj = try world.allocator.create(Base);
-        obj.* = Base{};
+        obj.* = init;
         obj.world = world;
         if (world.first) |next| {
             obj.next = next;
@@ -55,18 +59,18 @@ pub const Base = struct {
 
 pub const Ship = struct {
     todo: u8 = 0,
-    pub fn create(world: *World) !*Base {
-        const obj = try Base.create(world);
-        obj.object = Object{.ship = Ship{}};
-        return obj;
-    }
+    // pub fn create(world: *World) !*Base {
+    //     const obj = try Base.create(world);
+    //     //obj.object = Object{.ship = Ship{}};
+    //     return obj;
+    // }
 };
 
 pub const Bullet = struct {
     todo: u8 = 0,
-    pub fn create(world: *World) !*Base {
-        const obj = try Base.create(world);
-        obj.object = Object{.bullet = Bullet{}};
-        return obj;
-    }
+    // pub fn create(world: *World) !*Base {
+    //     const obj = try Base.create(world);
+    //     //obj.object = Object{.bullet = Bullet{}};
+    //     return obj;
+    // }
 };
