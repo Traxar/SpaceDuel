@@ -1,5 +1,5 @@
 const std = @import("std");
-const r = @import("imports.zig").raylib;
+const r = @import("c.zig").raylib;
 const w = @import("world.zig");
 
 const Mode = enum{
@@ -67,17 +67,12 @@ pub fn main() !void {
                 mode = .menu;
                 scorePlayer = 0;
                 scoreEnemy = 0;
-                _ = try w.Base.create(&world,w.Base{
-                    .position = r.Vector2{
+                _ = try world.add(w.Ship.new(
+                    r.Vector2{
                         .x = 0,
                         .y = 0,
                     },
-                    .facing = 0,
-                    .object = w.Object{.ship = w.Ship{
-
-                    }},
-                });
-                //_ = try w.Bullet.create(&world);
+                    0));
             },
             .menu => {
                 if (r.IsKeyPressed(r.KEY_F11)) {
