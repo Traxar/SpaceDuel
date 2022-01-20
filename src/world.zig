@@ -4,6 +4,20 @@ const r = @import("c.zig").raylib;
 const math = std.math;
 const invtau = 1/math.tau;
 
+pub const Texture = enum {
+    ship,
+    flame,
+    bullet,
+    pub fn get(self: Texture) r.Texture2D {
+        return textures[@enumToInt(self)];
+    }
+    pub fn set(self: Texture, texture: r.Texture2D) void {
+        textures[@enumToInt(self)] = texture;
+    }
+};
+
+var textures: [@typeInfo(Texture).Enum.fields.len]r.Texture2D = undefined;
+
 pub const World = struct {
     first: ?*Base = null,
     allocator: *const std.mem.Allocator = undefined,
@@ -28,9 +42,30 @@ pub const World = struct {
         }
         self.first = null;
     }
+
+    pub fn update(self: *World) !void {
+        var o = self.first;
+        while (o) |obj| {
+            o = obj.next;
+            try obj.update();
+        }
+    }
+
+    pub fn render(self: *World) void {
+        var o = self.first;
+        while (o) |obj| {
+            o = obj.next;
+            obj.render();
+        }
+    }
 };
 
-pub const Object = union {
+const ObjectTag = enum{
+    ship,
+    bullet
+};
+
+pub const Object = union(ObjectTag) {
     ship: Ship,
     bullet: Bullet,
 };
@@ -85,23 +120,25 @@ pub const Base = struct {
                     );
                 }
                 //turn controller
-                const target = r.Vector2Subtract(
-                    self.target,
+                const target = vector2AddScaled(
+                    ship.target,
+                    -1,
                     self.position
                 );
-                const diff = r.Vector2Subtract(
-                    target,
-                    self.prevTarget
+                const diff = vector2AddScaled(
+                    ship.target,
+                    -1,
+                    ship.prevTarget
                 );
-                var t = self.aimassist;
+                var t = ship.aimassist;
                 //aimassist
-                if (self.aimassist!=0) {
+                if (ship.aimassist!=0) {
 
                 }
                 const aim = vector2AddScaled(target,t,diff);
                 //turning
                 if (aim.x != 0 and aim.y != 0) {
-                    var angAcc = math.atan2(aim.y,aim.x) * invtau - self.facing;
+                    var angAcc = math.atan2(f32,aim.y,aim.x) * invtau - self.facing;
                     if (angAcc>0.5) {
                         angAcc -= 1;
                     }
@@ -109,23 +146,23 @@ pub const Base = struct {
                         angAcc += 1;
                     }
                     self.angAcc += @maximum(
-                        -self.shipTurn,
+                        -ship.shipTurn,
                         @minimum(
                             angAcc,
-                            self.shipTurn
+                            ship.shipTurn
                         )
                     );
                 }
-                self.prevTarget = target;
+                self.object.ship.prevTarget = target;
             },
-            .bullet => |bullet| {
+            .bullet => {
                 //bullet update
-                if (bullet.lifespan<0) {
+                if (self.object.bullet.lifespan == 0) {
                     self.destroy();
                     return;
                 }
                 else {
-                    bullet.lifespan -= 1;
+                    self.object.bullet.lifespan -= 1;
                 }
             },
         }
@@ -136,11 +173,12 @@ pub const Base = struct {
             self.linInvInert,
             self.linAcc
         );
-        self.position = r.Vector2Add(
+        self.position = vector2AddScaled(
             self.position,
+            1,
             self.linVel
         );
-        self.linVel = r.Vector2Scale(
+        self.linVel = vector2Scale(
             self.linVel,
             self.linInvDrag
         );
@@ -158,58 +196,47 @@ pub const Base = struct {
         self.angAcc = 0;
         //update 2
         switch (self.object) {
-            .ship => |ship| {
-                if (ship.cooldown > 0) {
-                    ship.cooldown -= 1;
-                    ship.shoot = false;
+            .ship => {
+                if (self.object.ship.cooldown > 0) {
+                    self.object.ship.cooldown -= 1;
+                    self.object.ship.shoot = false;
                 }
-                else if (ship.shoot) {
+                else if (self.object.ship.shoot) {
                     try self.spawnBullet();
-                    ship.cooldown = ship.gunCooldown;
+                    self.object.ship.cooldown = self.object.ship.gunCooldown;
                 }
             },
             .bullet => { },
         }
     }
-};
 
-pub const Ship = struct {
-    //controls
-    accelerate: bool = undefined,
-    shoot: bool = undefined,
-    target: r.Vector2 = undefined,
-    //stats
-    shipThrust: f32,
-    shipTurn: f32,
-    hp: u8,
-    gunCooldown: u8,
-    bulletSpeed: f32,
-    bulletSize: f32,
-    bulletLifespan: u8,
-    //misc
-    cooldown: u8 = 0,
-    aimassist: f32 = 0,
-    prevTarget: r.Vector2 = undefined,
+    fn render(self: *Base) void {
+        switch (self.object) {
+            .ship => |ship| {
+                const scale = self.size/16;
+                const shipPos = vector2AddPolar(self.position,16*scale*math.sqrt2,self.facing-0.125);
+                r.DrawTextureEx(
+                    Texture.ship.get(),
+                    shipPos,
+                    self.facing*360+90,
+                    scale,
+                    r.WHITE
+                );
+                if (ship.accelerate) {
+                    const flamePos = vector2AddPolar(self.position,16*scale*math.sqrt2,self.facing-0.375);
+                    r.DrawTextureEx(
+                        Texture.flame.get(),
+                        flamePos,
+                        self.facing*360+90,
+                        scale,
+                        r.WHITE
+                    );
+                }
+            },
+            .bullet => {
 
-    pub fn new(position: r.Vector2, facing: f32) Base {
-        const topSpeed: f32 = 20;
-        const thrust: f32 = 0.2;
-        return Base{
-            .position = position,
-            .facing = facing,
-            .size = 20,
-            .object = Object{.ship = Ship{
-                .shipThrust = thrust,
-                .shipTurn = 0.005,
-                .hp = 10,
-                .gunCooldown = 60,
-                .bulletSpeed = topSpeed,
-                .bulletSize = 4,
-                .bulletLifespan = 120,
-            }},
-            .linInvDrag = 1-(thrust/topSpeed),
-            .angInvDrag = 0.8,
-        };
+            },
+        }
     }
 
     fn spawnBullet(self: *Base) !void {
@@ -239,30 +266,71 @@ pub const Ship = struct {
     }
 };
 
+pub const Ship = struct {
+    //controls
+    accelerate: bool = undefined,
+    shoot: bool = undefined,
+    target: r.Vector2 = undefined,
+    //stats
+    shipThrust: f32,
+    shipTurn: f32,
+    hp: u8,
+    gunCooldown: u8,
+    bulletSpeed: f32,
+    bulletSize: f32,
+    bulletLifespan: u8,
+    //misc
+    cooldown: u8 = 0,
+    aimassist: f32 = 0,
+    prevTarget: r.Vector2 = r.Vector2{
+        .x = 0,
+        .y = 0
+    },
+
+    pub fn new(position: r.Vector2, facing: f32) Base {
+        const topSpeed: f32 = 20;
+        const thrust: f32 = 0.2;
+        return Base{
+            .position = position,
+            .facing = facing,
+            .size = 20,
+            .object = Object{.ship = Ship{
+                .shipThrust = thrust,
+                .shipTurn = 0.005,
+                .hp = 10,
+                .gunCooldown = 60,
+                .bulletSpeed = topSpeed,
+                .bulletSize = 4,
+                .bulletLifespan = 120,
+            }},
+            .linInvDrag = 1-(thrust/topSpeed),
+            .angInvDrag = 0.8,
+        };
+    }
+};
+
 pub const Bullet = struct {
     shooter: *Base,
     lifespan: u8,
 };
 
 fn vector2AddPolar(vector: r.Vector2, length: f32, rotation: f32) r.Vector2 {
-    return r.Vector2Add(
-        vector,
-        r.Vector2Rotate(
-            r.Vector2{
-                .x = length,
-                .y = 0
-            },
-            rotation * math.tau
-        )
-    );
+    return r.Vector2{
+        .x = vector.x + length * math.cos(rotation * math.tau),
+        .y = vector.y + length * math.sin(rotation * math.tau),
+    };
 }
 
 fn vector2AddScaled(vector1: r.Vector2, scale: f32, vector2: r.Vector2) r.Vector2 {
-    return r.Vector2Add(
-        vector1,
-        r.Vector2Scale(
-            vector2,
-            scale
-        )
-    );
+    return r.Vector2{
+        .x = vector1.x + scale * vector2.x,
+        .y = vector1.y + scale * vector2.y,
+    };
+}
+
+fn vector2Scale(vector: r.Vector2, scale: f32) r.Vector2 {
+    return r.Vector2{
+        .x = vector.x * scale,
+        .y = vector.y * scale,
+    };
 }

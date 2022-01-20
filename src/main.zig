@@ -46,7 +46,12 @@ pub fn main() !void {
     r.InitAudioDevice();
     defer r.CloseAudioDevice();
     //load textures
-    //TODO
+    w.Texture.ship.set(r.LoadTexture("res/sprites/ship.png"));
+    defer r.UnloadTexture(w.Texture.ship.get());
+    w.Texture.flame.set(r.LoadTexture("res/sprites/flame.png"));
+    defer r.UnloadTexture(w.Texture.flame.get());
+    w.Texture.bullet.set(r.LoadTexture("res/sprites/bullet.png"));
+    defer r.UnloadTexture(w.Texture.bullet.get());
     //load sounds
     //TODO
     //setup
@@ -59,15 +64,20 @@ pub fn main() !void {
         .allocator = &allocator
     };
     defer world.clear();
+    var player: *w.Base = undefined;
+    //var enemy: *w.Base = undefined;
 
     while (!r.WindowShouldClose()) {
         //UPDATE-------------------------------------------------
         switch (mode) {
             .init => {
                 mode = .menu;
+                //reset
                 scorePlayer = 0;
                 scoreEnemy = 0;
-                _ = try world.add(w.Ship.new(
+                world.clear();
+                //setup
+                player = try world.add(w.Ship.new(
                     r.Vector2{
                         .x = 0,
                         .y = 0,
@@ -99,6 +109,13 @@ pub fn main() !void {
                 if (r.IsKeyPressed(r.KEY_SPACE)) {
                     mode = .pause;
                 }
+                //player
+                player.object.ship.accelerate = r.IsMouseButtonDown(r.MOUSE_BUTTON_RIGHT);
+                player.object.ship.shoot = r.IsMouseButtonDown(r.MOUSE_BUTTON_LEFT);
+                player.object.ship.target = r.GetTouchPosition(0);
+                //enemy
+                //update
+                try world.update();
             },
             .stats => {
                 if (r.IsKeyPressed(r.KEY_SPACE)) {
@@ -118,6 +135,8 @@ pub fn main() !void {
         defer allocator.free(scoreText);
         r.DrawText(scoreText.ptr, textSize, textSize, textSize, r.GRAY);
         //render
+        world.render();
+        //text
         const x = @divFloor(screenWidth,2);
         const y = @divFloor(screenHeight,2);
         switch (mode) {
@@ -138,7 +157,7 @@ pub fn main() !void {
                 drawTextCentered("[PAUSED - click anywhere to continue]",x,y,textSize,r.GRAY);
             },
             .play => {
-                
+
             },
             .stats => {
                 var text: [*]const u8 = undefined;
