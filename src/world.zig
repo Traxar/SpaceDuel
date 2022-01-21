@@ -49,6 +49,17 @@ pub const World = struct {
             o = obj.next;
             try obj.update();
         }
+        var aa = self.first;
+        while (aa) |a| {
+            aa = a.next;
+            var bb = aa;
+            while (bb) |b| {
+                bb = b.next;
+                if (detectCollision(a,b)) {
+                    solveCollision(a,b);
+                }
+            }
+        }
     }
 
     pub fn render(self: *World) void {
@@ -56,6 +67,29 @@ pub const World = struct {
         while (o) |obj| {
             o = obj.next;
             obj.render();
+        }
+    }
+
+    fn detectCollision(a: *Base, b: *Base) bool {
+        const dist = vector2AddScaled(
+            a.position,
+            -1,
+            b.position
+        );
+        const s = @maximum(a.size,b.size);
+        return dist.x * dist.x + dist.y * dist.y < s * s;
+    }
+
+    fn solveCollision(a: *Base, b: *Base) void {
+        if (a.object == .ship and b.object == .ship){
+            a.damage(a.hp);
+            b.damage(b.hp);
+        }
+        else if ((a.object == .bullet and b.object == .ship and a.object.bullet.shooter != b) or 
+            (a.object == .ship and b.object == .bullet and b.object.bullet.shooter != a)){
+            const ahp = a.hp;
+            a.damage(b.hp);
+            b.damage(ahp);
         }
     }
 };
@@ -80,6 +114,7 @@ pub const Base = struct {
     position: r.Vector2,
     facing: f32,
     size: f32,
+    hp: u8,
     linAcc: r.Vector2 = r.Vector2{
         .x = 0,
         .y = 0
@@ -109,6 +144,10 @@ pub const Base = struct {
     }
 
     fn update(self: *Base) !void {
+        if (self.hp == 0){
+            self.destroy();
+            return;
+        }
         switch (self.object) {
             .ship => |ship| {
                 //thrust controller
@@ -126,14 +165,27 @@ pub const Base = struct {
                     self.position
                 );
                 const diff = vector2AddScaled(
-                    ship.target,
+                    target,
                     -1,
                     ship.prevTarget
                 );
                 var t = ship.aimassist;
                 //aimassist
                 if (ship.aimassist!=0) {
-
+                    const a = diff.x * diff.x + diff.y * diff.y - self.object.ship.bulletSpeed * self.object.ship.bulletSpeed;
+                    const b = target.x * diff.x + target.y * diff.y;
+                    const c = target.x * target.x + target.y * target.y;
+                    const d = b*b-a*c;
+                    if (a<0 or (a>0 and b<0 and d>=0)) {
+                        t*= (-b-@sqrt(d))/a;
+                    }
+                    else if (a==0 and b<0) {
+                        t*= -c/b/2;
+                    }
+                    else {
+                        t=0;
+                        self.object.ship.shoot = false;
+                    }
                 }
                 const aim = vector2AddScaled(target,t,diff);
                 //turning
@@ -145,7 +197,7 @@ pub const Base = struct {
                     else if (angAcc<-0.5) {
                         angAcc += 1;
                     }
-                    self.angAcc += @maximum(
+                    self.angAcc += @maximum( 
                         -ship.shipTurn,
                         @minimum(
                             angAcc,
@@ -234,7 +286,15 @@ pub const Base = struct {
                 }
             },
             .bullet => {
-
+                const scale = self.size*5/16;
+                const bulletPos = vector2AddPolar(self.position,16*scale*math.sqrt2,self.facing-0.125);
+                r.DrawTextureEx(
+                    Texture.bullet.get(),
+                    bulletPos,
+                    self.facing*360+90,
+                    scale,
+                    r.WHITE
+                );
             },
         }
     }
@@ -250,6 +310,7 @@ pub const Base = struct {
                     ),
                     .facing = self.facing,
                     .size = ship.bulletSize,
+                    .hp = 1,
                     .object = Object{.bullet = Bullet{
                         .lifespan = ship.bulletLifespan,
                         .shooter = self,
@@ -261,7 +322,18 @@ pub const Base = struct {
                     )
                 });
             },
-            .bullet => unreachable,
+            else => unreachable,
+        }
+    }
+
+    fn damage(self: *Base, dmg: u8) void{
+        const d = @minimum(dmg,self.hp);
+        self.hp -= d;
+        if (self.object == .ship){
+            const powerUp: f32 = 1.08;
+            self.object.ship.shipThrust *= powerUp;
+            self.object.ship.gunCooldown = @floatToInt(u8,@ceil(@intToFloat(f32,self.object.ship.gunCooldown)/powerUp));
+            self.object.ship.bulletSpeed *= powerUp;
         }
     }
 };
@@ -274,7 +346,6 @@ pub const Ship = struct {
     //stats
     shipThrust: f32,
     shipTurn: f32,
-    hp: u8,
     gunCooldown: u8,
     bulletSpeed: f32,
     bulletSize: f32,
@@ -294,10 +365,10 @@ pub const Ship = struct {
             .position = position,
             .facing = facing,
             .size = 20,
+            .hp = 10,
             .object = Object{.ship = Ship{
                 .shipThrust = thrust,
                 .shipTurn = 0.005,
-                .hp = 10,
                 .gunCooldown = 60,
                 .bulletSpeed = topSpeed,
                 .bulletSize = 4,

@@ -65,7 +65,7 @@ pub fn main() !void {
     };
     defer world.clear();
     var player: *w.Base = undefined;
-    //var enemy: *w.Base = undefined;
+    var enemy: *w.Base = undefined;
 
     while (!r.WindowShouldClose()) {
         //UPDATE-------------------------------------------------
@@ -79,10 +79,17 @@ pub fn main() !void {
                 //setup
                 player = try world.add(w.Ship.new(
                     r.Vector2{
-                        .x = 0,
-                        .y = 0,
+                        .x = @intToFloat(f32,screenWidth)/4,
+                        .y = @intToFloat(f32,screenHeight)/2,
+                    },
+                    0.5));
+                enemy = try world.add(w.Ship.new(
+                    r.Vector2{
+                        .x = 3*@intToFloat(f32,screenWidth)/4,
+                        .y = @intToFloat(f32,screenHeight)/2,
                     },
                     0));
+                enemy.object.ship.shipThrust /= 2;
             },
             .menu => {
                 if (r.IsKeyPressed(r.KEY_F11)) {
@@ -93,6 +100,8 @@ pub fn main() !void {
                 }
                 else if (r.IsMouseButtonPressed(r.MOUSE_BUTTON_LEFT) 
                     or r.IsMouseButtonPressed(r.MOUSE_BUTTON_RIGHT)) {
+                    enemy.object.ship.accelerate = true;
+                    enemy.object.ship.aimassist = @intToFloat(f32,diff)/@intToFloat(f32,diffs.len-1);
                     mode = .play;
                 }
             },
@@ -114,8 +123,19 @@ pub fn main() !void {
                 player.object.ship.shoot = r.IsMouseButtonDown(r.MOUSE_BUTTON_LEFT);
                 player.object.ship.target = r.GetTouchPosition(0);
                 //enemy
+                enemy.object.ship.shoot = true;
+                enemy.object.ship.target = player.position;
                 //update
                 try world.update();
+                //update score
+                if (player.hp != 0 or enemy.hp != 0){
+                    scorePlayer = 10 - enemy.hp;
+                    scoreEnemy = 10 - player.hp;
+                }
+                if (player.hp == 0 or enemy.hp == 0){
+                    mode = .stats;
+                }
+
             },
             .stats => {
                 if (r.IsKeyPressed(r.KEY_SPACE)) {
@@ -162,10 +182,8 @@ pub fn main() !void {
             .stats => {
                 var text: [*]const u8 = undefined;
                 var subtext: [*]const u8 = undefined;
-                if (true) {
-                // if (player.hp > 0) {
-                    if (true) {
-                    // if (scoreEnemy > 0) {
+                if (player.hp > 0) {
+                    if (scoreEnemy > 0) {
                         text = "GG WP, pilot";
                         subtext = switch (diff) {
                             0,1 => "wanna try a harder difficulty?",
@@ -184,10 +202,8 @@ pub fn main() !void {
                         };
                     }
                 }
-                else if (true) {
-                // else if (enemy.hp > 0) {
-                    if (true) {
-                    // if (enemy.hp > 2) {
+                else if (enemy.hp > 0) {
+                    if (enemy.hp > 2) {
                         text = "GG EZ";
                         subtext = "better luck next time";
                     }
@@ -203,6 +219,7 @@ pub fn main() !void {
                 drawTextCentered(text,x,y,2*textSize,r.GRAY);
                 drawTextCentered(subtext,x,y+2*textSize,textSize,r.GRAY);
                 const diffText = std.fmt.allocPrintZ(allocator,"[{s}]",.{diffs[diff]}) catch "ERROR";
+                defer allocator.free(diffText);
                 drawTextCentered(diffText.ptr,x,y+4*textSize,textSize,r.GRAY);
                 drawTextCentered("[SPACE - continue]",x,y+6*textSize,textSize,r.GRAY);
             },
