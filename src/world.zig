@@ -18,6 +18,23 @@ pub const Texture = enum {
 
 var textures: [@typeInfo(Texture).Enum.fields.len]r.Texture2D = undefined;
 
+pub const Sound = enum {
+    shot,
+    hit,
+    death,
+    pub fn get(self: Sound) r.Sound {
+        return sounds[@enumToInt(self)];
+    }
+    pub fn set(self: Sound, sound: r.Sound) void {
+        sounds[@enumToInt(self)] = sound;
+    }
+    pub fn play(self: Sound) void {
+        r.PlaySound(sounds[@enumToInt(self)]);
+    }
+};
+
+var sounds: [@typeInfo(Sound).Enum.fields.len]r.Sound = undefined;
+
 pub const World = struct {
     first: ?*Base = null,
     allocator: *const std.mem.Allocator = undefined,
@@ -189,7 +206,7 @@ pub const Base = struct {
                 }
                 const aim = vector2AddScaled(target,t,diff);
                 //turning
-                if (aim.x != 0 and aim.y != 0) {
+                if (aim.x != 0 or aim.y != 0) {
                     var angAcc = math.atan2(f32,aim.y,aim.x) * invtau - self.facing;
                     if (angAcc>0.5) {
                         angAcc -= 1;
@@ -321,6 +338,7 @@ pub const Base = struct {
                         self.facing
                     )
                 });
+                Sound.shot.play();
             },
             else => unreachable,
         }
@@ -330,6 +348,8 @@ pub const Base = struct {
         const d = @minimum(dmg,self.hp);
         self.hp -= d;
         if (self.object == .ship){
+            if (self.hp == 0) { Sound.death.play(); }
+            else { Sound.hit.play(); }
             const powerUp: f32 = 1.08;
             self.object.ship.shipThrust *= powerUp;
             self.object.ship.gunCooldown = @floatToInt(u8,@ceil(@intToFloat(f32,self.object.ship.gunCooldown)/powerUp));

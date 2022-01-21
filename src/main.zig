@@ -41,7 +41,7 @@ pub fn main() !void {
     defer r.CloseWindow();
     r.SetTargetFPS(FPS);
     //make fullscreen on full resolution
-    //toggleFullscreen();
+    toggleFullscreen();
     //init audio
     r.InitAudioDevice();
     defer r.CloseAudioDevice();
@@ -53,7 +53,12 @@ pub fn main() !void {
     w.Texture.bullet.set(r.LoadTexture("res/sprites/bullet.png"));
     defer r.UnloadTexture(w.Texture.bullet.get());
     //load sounds
-    //TODO
+    w.Sound.shot.set(r.LoadSound("res/sounds/shot.wav"));
+    defer r.UnloadSound(w.Sound.shot.get());
+    w.Sound.hit.set(r.LoadSound("res/sounds/hit.wav"));
+    defer r.UnloadSound(w.Sound.hit.get());
+    w.Sound.death.set(r.LoadSound("res/sounds/death.wav"));
+    defer r.UnloadSound(w.Sound.death.get());
     //setup
 
     var mode: Mode = .init;
@@ -121,7 +126,10 @@ pub fn main() !void {
                 //player
                 player.object.ship.accelerate = r.IsMouseButtonDown(r.MOUSE_BUTTON_RIGHT);
                 player.object.ship.shoot = r.IsMouseButtonDown(r.MOUSE_BUTTON_LEFT);
-                player.object.ship.target = r.GetTouchPosition(0);
+                player.object.ship.target = r.Vector2{
+                    .x = @intToFloat(f32,r.GetMouseX()),
+                    .y = @intToFloat(f32,r.GetMouseY())
+                };
                 //enemy
                 enemy.object.ship.shoot = true;
                 enemy.object.ship.target = player.position;
