@@ -1,6 +1,6 @@
 const std = @import("std");
 const r = @import("c.zig").raylib;
-const w = @import("world.zig");
+const o = @import("objects.zig");
 
 const Mode = enum{
     init,
@@ -41,36 +41,36 @@ pub fn main() !void {
     defer r.CloseWindow();
     r.SetTargetFPS(FPS);
     //make fullscreen on full resolution
-    toggleFullscreen();
+    //toggleFullscreen();
     //init audio
     r.InitAudioDevice();
     defer r.CloseAudioDevice();
     //load textures
-    w.Texture.ship.set(r.LoadTexture("res/sprites/ship.png"));
-    defer r.UnloadTexture(w.Texture.ship.get());
-    w.Texture.flame.set(r.LoadTexture("res/sprites/flame.png"));
-    defer r.UnloadTexture(w.Texture.flame.get());
-    w.Texture.bullet.set(r.LoadTexture("res/sprites/bullet.png"));
-    defer r.UnloadTexture(w.Texture.bullet.get());
+    o.Texture.ship.set(r.LoadTexture("res/sprites/ship.png"));
+    defer r.UnloadTexture(o.Texture.ship.get());
+    o.Texture.flame.set(r.LoadTexture("res/sprites/flame.png"));
+    defer r.UnloadTexture(o.Texture.flame.get());
+    o.Texture.bullet.set(r.LoadTexture("res/sprites/bullet.png"));
+    defer r.UnloadTexture(o.Texture.bullet.get());
     //load sounds
-    w.Sound.shot.set(r.LoadSound("res/sounds/shot.wav"));
-    defer r.UnloadSound(w.Sound.shot.get());
-    w.Sound.hit.set(r.LoadSound("res/sounds/hit.wav"));
-    defer r.UnloadSound(w.Sound.hit.get());
-    w.Sound.death.set(r.LoadSound("res/sounds/death.wav"));
-    defer r.UnloadSound(w.Sound.death.get());
+    o.Sound.shot.set(r.LoadSound("res/sounds/shot.wav"));
+    defer r.UnloadSound(o.Sound.shot.get());
+    o.Sound.hit.set(r.LoadSound("res/sounds/hit.wav"));
+    defer r.UnloadSound(o.Sound.hit.get());
+    o.Sound.death.set(r.LoadSound("res/sounds/death.wav"));
+    defer r.UnloadSound(o.Sound.death.get());
     //setup
 
     var mode: Mode = .init;
     var diff: usize = 0;
     var scorePlayer: u8 = undefined;
     var scoreEnemy: u8 = undefined;
-    var world = w.World{
+    var world = o.World{
         .allocator = &allocator
     };
     defer world.clear();
-    var player: *w.Base = undefined;
-    var enemy: *w.Base = undefined;
+    var player: *o.Base = undefined;
+    var enemy: *o.Base = undefined;
 
     while (!r.WindowShouldClose()) {
         //UPDATE-------------------------------------------------
@@ -82,13 +82,13 @@ pub fn main() !void {
                 scoreEnemy = 0;
                 world.clear();
                 //setup
-                player = try world.add(w.Ship.new(
+                player = try world.add(o.Ship.new(
                     r.Vector2{
                         .x = @intToFloat(f32,screenWidth)/4,
                         .y = @intToFloat(f32,screenHeight)/2,
                     },
                     0.5));
-                enemy = try world.add(w.Ship.new(
+                enemy = try world.add(o.Ship.new(
                     r.Vector2{
                         .x = 3*@intToFloat(f32,screenWidth)/4,
                         .y = @intToFloat(f32,screenHeight)/2,

@@ -1,4 +1,6 @@
 const std = @import("std");
+const GitRepoStep = @import("GitRepoStep.zig");
+const RaylibBuild = @import("dep/raylib/src/build.zig");
 
 pub fn build(b: *std.build.Builder) void {
     // Standard target options allows the person running `zig build` to choose
@@ -11,40 +13,36 @@ pub fn build(b: *std.build.Builder) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const mode = b.standardReleaseOptions();
 
+    const raylib_repo = GitRepoStep.create(b, .{
+    .url = "https://github.com/raysan5/raylib",
+    .branch = null,
+    .sha = "559ffc633164c30824065a63324ba08efa651ee6",
+    .fetch_enabled = true,
+    });
+
+    const raylib = RaylibBuild.addRaylib(b,target);
+    raylib.install();
+
     const exe = b.addExecutable("SpaceDuel", "src/main.zig");
     exe.setTarget(target);
     exe.setBuildMode(mode);
 
+    exe.step.dependOn(&raylib_repo.step);
+
     // cImport
     exe.linkLibC();
     // raylib.h
-    exe.addIncludeDir("lib/raylib");
-    // raylib
+    exe.addIncludeDir("dep/raylib/src");
+
     exe.addObjectFile(switch (target.getOsTag()) {
-        .windows => "lib/raylib/raylib.lib",
-        .linux => "lib/raylib/libraylib.a",
+        .windows => "zig-out/lib/raylib.lib",
+        .linux => "zig-out/lib/libraylib.a",
         else => @panic("Unsupported OS")
     });
-    // system libs for raylib
-    switch (exe.target.toTarget().os.tag) {
-        .windows => {
-            exe.linkSystemLibrary("winmm");
-            exe.linkSystemLibrary("gdi32");
-            exe.linkSystemLibrary("opengl32");
-        },
-        .linux => {
-            // exe.linkSystemLibrary("GL");
-            exe.linkSystemLibrary("rt");
-            exe.linkSystemLibrary("dl");
-            exe.linkSystemLibrary("m");
-            // exe.linkSystemLibrary("X11");
-        },
-        else => {
-            @panic("Unsupported OS");
-        },
-    }
 
     exe.install();
+
+    //todo: copy resources (res) into output dir, so game becomes easily portable
 
     const run_cmd = exe.run();
     run_cmd.step.dependOn(b.getInstallStep());
